@@ -1,55 +1,131 @@
-name: DevSecOps Vulnerability Scan Pipeline
+name: DevSecOps Container Security Pipeline
 
 on:
   push:
-    branches: [ "main", "develop" ]
+    branches: [main, develop]
   pull_request:
-    branches: [ "main" ]
+    branches: [main]
+  workflow_dispatch:
   schedule:
-    - cron: '0 8 * * 1-5' # Daily baseline scan (Sprint 3)
+    - cron: '0 8 * * 1-5'
 
-env:
-  IMAGE_NAME: "my-app"
-  IMAGE_TAG: "${{ github.sha }}"
-  SEVERITY_THRESHOLD: "HIGH,CRITICAL" # Configuration threshold (Sprint 2)
+permissions:
+  contents: read
+
+concurrency:
+  group: container-security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build-and-scan:
-    runs-on: ubuntu-latest
+  security-audit:
+    name: Build, Scan and Publish Report
+    # Ephemeral GitHub-hosted runner; no Azure VM or self-hosted runner required.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
-      - name: Checkout Code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Build Docker Image
+      - name: Build minimal CI image
         run: |
-          docker build -t ${{ env.IMAGE_NAME }}:${--env.IMAGE_TAG } .
-          docker tag ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} ${{ env.IMAGE_NAME }}:latest
+          docker build --pull \
+            -f dockerfiles/Dockerfile.ci \
+            -t "secdevops-ci:$GITHUB_SHA" .
+          docker image inspect "secdevops-ci:$GITHUB_SHA" >/dev/null
 
-      - name: Run Trivy Vulnerability Scanner (Sprint 1 & 2)
-        uses: aquasecurity/trivy-action@master
+      - name: Prepare report folder
+        run: mkdir -p reporting/ci
+
+      - name: Scan CI image with Trivy (JSON)
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
-          image-ref: '${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}'
-          format: 'json'
-          output: 'trivy-report.json' # Structured report generation (Sprint 3)
-          severity: '${{ env.SEVERITY_THRESHOLD }}'
-          exit-code: '1' # Fails the pipeline if vulnerabilities matching threshold are caught (Sprint 2)
-          ignore-unfixed: true
-          trivyignores: '.trivyignore' # Advanced exception handling lookup (Sprint 5)
+          scan-type: image
+          image-ref: secdevops-ci:${{ github.sha }}
+          scanners: vuln,secret
+          format: json
+          output: reporting/ci/trivy-report.json
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+          ignore-unfixed: false
+          exit-code: '0'
+          cache: true
 
-      - name: Upload Security Report Artifact
+      - name: Verify report exists and is valid
+        run: |
+          test -s reporting/ci/trivy-report.json
+          python3 -m json.tool reporting/ci/trivy-report.json > /dev/null
+
+      - name: Upload scan evidence
+        if: always()
         uses: actions/upload-artifact@v4
-        if: always() # Ensures reports are preserved even if the scanning phase fails
         with:
-          name: vulnerability-report
-          path: trivy-report.json
+          name: security-report-${{ github.run_id }}
+          path: reporting/ci/
+          if-no-files-found: warn
           retention-days: 30
 
-      - name: Send Slack Notification (Sprint 3)
-        uses: 8398a7/action-slack@v3
-        with:
-          status: ${{ job.status }}
-          fields: repo,message,commit,author,action,eventName,ref,workflow,job,took
-          text: 'Vulnerability Scan Complete. Status: ${{ job.status }}. View artifact log for detailed breakdown.'
+      - name: Enforce HIGH/CRITICAL and secret policy
+        run: |
+          python3 - <<'PY'
+          import json
+          import sys
+          from collections import Counter
+          from pathlib import Path
+
+          path = Path("reporting/ci/trivy-report.json")
+          data = json.loads(path.read_text(encoding="utf-8"))
+          if not isinstance(data, dict) or not isinstance(data.get("Results"), list):
+              raise SystemExit("ERROR: Trivy report is missing Results")
+
+          counts = Counter()
+          secrets = 0
+          for result in data["Results"]:
+              for vuln in result.get("Vulnerabilities") or []:
+                  counts[str(vuln.get("Severity", "UNKNOWN")).upper()] += 1
+              secrets += len(result.get("Secrets") or [])
+
+          high = counts["HIGH"]
+          critical = counts["CRITICAL"]
+          print(f"HIGH={high}, CRITICAL={critical}, SECRETS={secrets}")
+          with open(__import__("os").environ["GITHUB_STEP_SUMMARY"], "a") as summary:
+              summary.write(
+                  f"## Container security scan\n\n"
+                  f"- HIGH vulnerabilities: {high}\n"
+                  f"- CRITICAL vulnerabilities: {critical}\n"
+                  f"- Secrets detected: {secrets}\n"
+                  f"- Image: secdevops-ci\n"
+              )
+
+          if high or critical or secrets:
+              print("Security policy FAILED; see the uploaded JSON artifact")
+              sys.exit(1)
+          print("Security policy PASSED")
+          PY
+
+      - name: Send optional Slack notification
+        if: always() && github.event_name != 'pull_request'
+        continue-on-error: true
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-        if: always() 
+          JOB_STATUS: ${{ job.status }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$SLACK_WEBHOOK_URL" ]; then
+            echo "No Slack secret configured; skipping notification"
+            exit 0
+          fi
+          python3 - <<'PY'
+          import json
+          import os
+          import urllib.request
+          body = json.dumps({
+              "text": f"SecDevOps CI status: {os.environ['JOB_STATUS']}\nRun: {os.environ['RUN_URL']}"
+          }).encode()
+          request = urllib.request.Request(
+              os.environ["SLACK_WEBHOOK_URL"],
+              data=body,
+              headers={"Content-Type": "application/json"},
+              method="POST"
+          )
+          with urllib.request.urlopen(request, timeout=15) as response:
+              print("Slack status:", response.status)
+          PY
