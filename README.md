@@ -292,7 +292,7 @@ sample figures from the original brief · monthly counts, Jan to Apr
 
 The figures above are sample data from the original brief, not live scan results.
 
-### Testing and results
+## Testing and results
 
 <img width="1600" height="809" alt="image" src="https://github.com/user-attachments/assets/39e63708-e050-415a-b90a-edeaacc0bb9e" />
 <img width="1286" height="483" alt="image" src="https://github.com/user-attachments/assets/b486f013-aba7-4ffe-83bf-0c80cd2a6bbd" />
@@ -301,7 +301,7 @@ Successful GitHub Actions execution and security summary.
 The successful run confirms the positive execution path for the minimal CI image. It does not establish that every application image is safe, that a vulnerable image is blocked, or that the artifact contents are complete beyond the reported validation step. The warning annotation is not expanded in the supplied screenshot and therefore remains unidentified.
 Run evidence: https://github.com/GohelG/secdevops/actions/runs/45415679780
 
-### Troubleshooting and local evidence
+## Troubleshooting and local evidence
 
 <img width="1587" height="914" alt="image" src="https://github.com/user-attachments/assets/3a5cddf2-f92e-4420-81ad-287f7b8cb930" />
 Figure 7. Local Ubuntu and Alpine scans: zero reported vulnerabilities, with an Ubuntu support warning.
@@ -313,9 +313,9 @@ Figure 8. Earlier report parsing failure (cropped from supplied terminal evidenc
 
 The earlier script saved a human-readable table as scan_report.json, causing the Python parser to reject the file. The corrective approach is to request JSON explicitly and validate it before reporting or policy evaluation. Run 15 shows a report-validation step succeeding, although the local script itself has not been retested in the supplied evidence.
 
-### Cost optimization and limitations
+## Cost optimization and limitations
 
-## Cost-conscious design
+### Cost-conscious design
 
 The project uses open-source scanning and monitoring tools to reduce licensing overhead. Running build and scan on a short-lived CI runner can remove the need for a dedicated scanning VM, provided the workflow is configured to use a hosted runner. Persistent monitoring remains a separate infrastructure requirement. Caching the Trivy database can reduce repeated downloads, while sensible artifact retention and Docker image cleanup limit storage growth. Cleanup should avoid removing images needed by active workloads.
 The roadmap proposes burstable or low-cost monitoring instances, direct webhook notifications and batch metric emission [2]. No cloud billing records or controlled cost comparisons were supplied, so monetary savings are not quantified here.
