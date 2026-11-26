@@ -123,49 +123,140 @@ trivy image \\
 -o report.json \\  
 myapp:latest
 ```
-### Jenkins pipeline
-```
-pipeline {  
-agent any  
-stages {  
-stage('Build Image') {  
-steps { sh 'docker build -t myapp:\${BUILD_NUMBER} .' }  
-}  
-stage('Security Scan') {  
-steps {  
-sh '''  
-trivy image \\  
---severity HIGH,CRITICAL \\  
---exit-code 1 \\  
-myapp:\${BUILD_NUMBER}  
-
-}  
-}  
-stage('Push Image') {  
-steps { sh 'docker push myapp:\${BUILD_NUMBER}' }  
-}  
-}  
-}
-```
 ### GitHub Actions workflow
 ```
-name: Container Security Scan  
-on:  
-push:  
-branches: \[main\]  
-jobs:  
-scan:  
-runs-on: ubuntu-latest  
-steps:  
-- uses: actions/checkout@v4  
-- name: Build image  
-run: docker build -t app:\${{ github.sha }} .  
-- name: Scan image  
-uses: aquasecurity/trivy-action@0.28.0  
-with:  
-image-ref: app:\${{ github.sha }}  
-severity: CRITICAL,HIGH  
-exit-code: '1'
+name: DevSecOps Container Security Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '0 8 * * 1-5'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: container-security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  security-audit:
+    name: Build, Scan and Publish Report
+    # Ephemeral GitHub-hosted runner; no Azure VM or self-hosted runner required.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build minimal CI image
+        run: |
+          docker build --pull \
+            -f dockerfiles/Dockerfile.ci \
+            -t "secdevops-ci:$GITHUB_SHA" .
+          docker image inspect "secdevops-ci:$GITHUB_SHA" >/dev/null
+
+      - name: Prepare report folder
+        run: mkdir -p reporting/ci
+
+      - name: Scan CI image with Trivy (JSON)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: image
+          image-ref: secdevops-ci:${{ github.sha }}
+          scanners: vuln,secret
+          format: json
+          output: reporting/ci/trivy-report.json
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+          ignore-unfixed: false
+          exit-code: '0'
+          cache: true
+
+      - name: Verify report exists and is valid
+        run: |
+          test -s reporting/ci/trivy-report.json
+          python3 -m json.tool reporting/ci/trivy-report.json > /dev/null
+
+      - name: Upload scan evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-report-${{ github.run_id }}
+          path: reporting/ci/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Enforce HIGH/CRITICAL and secret policy
+        run: |
+          python3 - <<'PY'
+          import json
+          import sys
+          from collections import Counter
+          from pathlib import Path
+
+          path = Path("reporting/ci/trivy-report.json")
+          data = json.loads(path.read_text(encoding="utf-8"))
+          if not isinstance(data, dict) or not isinstance(data.get("Results"), list):
+              raise SystemExit("ERROR: Trivy report is missing Results")
+
+          counts = Counter()
+          secrets = 0
+          for result in data["Results"]:
+              for vuln in result.get("Vulnerabilities") or []:
+                  counts[str(vuln.get("Severity", "UNKNOWN")).upper()] += 1
+              secrets += len(result.get("Secrets") or [])
+
+          high = counts["HIGH"]
+          critical = counts["CRITICAL"]
+          print(f"HIGH={high}, CRITICAL={critical}, SECRETS={secrets}")
+          with open(__import__("os").environ["GITHUB_STEP_SUMMARY"], "a") as summary:
+              summary.write(
+                  f"## Container security scan\n\n"
+                  f"- HIGH vulnerabilities: {high}\n"
+                  f"- CRITICAL vulnerabilities: {critical}\n"
+                  f"- Secrets detected: {secrets}\n"
+                  f"- Image: secdevops-ci\n"
+              )
+
+          if high or critical or secrets:
+              print("Security policy FAILED; see the uploaded JSON artifact")
+              sys.exit(1)
+          print("Security policy PASSED")
+          PY
+
+      - name: Send optional Slack notification
+        if: always() && github.event_name != 'pull_request'
+        continue-on-error: true
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          JOB_STATUS: ${{ job.status }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$SLACK_WEBHOOK_URL" ]; then
+            echo "No Slack secret configured; skipping notification"
+            exit 0
+          fi
+          python3 - <<'PY'
+          import json
+          import os
+          import urllib.request
+          body = json.dumps({
+              "text": f"SecDevOps CI status: {os.environ['JOB_STATUS']}\nRun: {os.environ['RUN_URL']}"
+          }).encode()
+          request = urllib.request.Request(
+              os.environ["SLACK_WEBHOOK_URL"],
+              data=body,
+              headers={"Content-Type": "application/json"},
+              method="POST"
+          )
+          with urllib.request.urlopen(request, timeout=15) as response:
+              print("Slack status:", response.status)
+          PY
+
 ```
 <img src="images/media/image10.png" style="width:6in;height:3.52876in" alt="The container-security.yml workflow open in VS Code" />
 
