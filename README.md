@@ -97,6 +97,10 @@ Six sprints of 20 hours each build the scanner in stages, from a basic scan to a
 
 *Figure 8. The first Trivy scan of ubuntu/nginx:latest (Ubuntu 25.04). It reports one HIGH finding, CVE-2025-68973 in gpgv, with status fixed.*
 
+<img src="images/media/image11.png" style="width:6in;height:2.9679in" alt="Terminal output of the local scan script on ubuntu:18.04" />
+
+*Figure 10. A local scan run on ubuntu:18.04. It reports 0 vulnerabilities, but the log also shows a failed-to-parse error when the alert is generated. That step needs a fix.*
+
 ## Solution architecture
 
 <img src="images/media/image9.png" style="width:6in;height:3.23214in" alt="scan and reporting flow · 9 steps, 1 gate" />
@@ -263,10 +267,6 @@ jobs:
 *Figure 9. The workflow file in the repository. It still uses trivy-action@master, which the pinning note below recommends replacing.*
 
 Pin the scanner action to a released version tag, as above, rather than @master. An unpinned action can change without notice and alter the gate.
-
-<img src="images/media/image11.png" style="width:6in;height:2.9679in" alt="Terminal output of the local scan script on ubuntu:18.04" />
-
-*Figure 10. A local scan run on ubuntu:18.04. It reports 0 vulnerabilities, but the log also shows a failed-to-parse error when the alert is generated. That step needs a fix.*
 
 ## Notifications
 
