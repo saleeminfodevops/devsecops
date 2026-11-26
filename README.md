@@ -93,13 +93,14 @@ Six sprints of 20 hours each build the scanner in stages, from a basic scan to a
 
 *Figure 7. Trivy 0.71.2, with the vulnerability database update status.*
 
-<img src="images/media/image8.png" style="width:6in;height:3.18514in" alt="Trivy scan report for ubuntu/nginx:latest" />
-
-*Figure 8. The first Trivy scan of ubuntu/nginx:latest (Ubuntu 25.04). It reports one HIGH finding, CVE-2025-68973 in gpgv, with status fixed.*
-
 <img src="images/media/image11.png" style="width:6in;height:2.9679in" alt="Terminal output of the local scan script on ubuntu:18.04" />
 
-*Figure 10. A local scan run on ubuntu:18.04. It reports 0 vulnerabilities, but the log also shows a failed-to-parse error when the alert is generated. That step needs a fix.*
+*Figure 8. A local scan run on ubuntu:18.04. It reports 0 vulnerabilities, but the log also shows a failed-to-parse error when the alert is generated. That step needs a fix.*
+
+<img src="images/media/image8.png" style="width:6in;height:3.18514in" alt="Trivy scan report for ubuntu/nginx:latest" />
+
+*Figure 9. The first Trivy scan of ubuntu/nginx:latest (Ubuntu 25.04). It reports one HIGH finding, CVE-2025-68973 in gpgv, with status fixed.*
+
 
 ## Solution architecture
 
