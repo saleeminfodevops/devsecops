@@ -14,9 +14,9 @@ An automated scanner that checks container images for known CVEs before they rea
 | Source repository | [github.com/saleeminfodevops/secdevops](https://github.com/saleeminfodevops/secdevops.git) |
 | Updated document | [Google Doc](https://docs.google.com/document/d/1EQq9ZQ6r5vhlbLKhOe246gi9TYp4PXvanYFe-uUuYBQ/edit?usp=sharing) |
 
-<img src="images/media/image1.png" style="width:6in;height:3.53314in" alt="SecDevOps team page on GitHub listing the four members" />
+<img width="946" height="583" alt="image" src="https://github.com/user-attachments/assets/3e258eed-664b-41a8-84f2-7cbcfda3c825" />
 
-*Figure 1. The SecDevOps team page on GitHub, with the four members and the capstone description.*
+*Figure 1. The DevSecOps team page on GitHub, with the four members and the capstone description.*
 
 ## Problem and goals
 
