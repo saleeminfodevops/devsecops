@@ -116,15 +116,15 @@ The scan runs as a pipeline stage after the image build and before the push. A c
 5.  A clean scan pushes the image to the registry.
 
 ### Example Trivy scan
-
+```
 trivy image \\  
 --severity HIGH,CRITICAL \\  
 --format json \\  
 -o report.json \\  
 myapp:latest
-
+```
 ### Jenkins pipeline
-
+```
 pipeline {  
 agent any  
 stages {  
@@ -138,7 +138,7 @@ trivy image \\
 --severity HIGH,CRITICAL \\  
 --exit-code 1 \\  
 myapp:\${BUILD_NUMBER}  
-'''  
+
 }  
 }  
 stage('Push Image') {  
@@ -146,9 +146,9 @@ steps { sh 'docker push myapp:\${BUILD_NUMBER}' }
 }  
 }  
 }
-
+```
 ### GitHub Actions workflow
-
+```
 name: Container Security Scan  
 on:  
 push:  
@@ -166,7 +166,7 @@ with:
 image-ref: app:\${{ github.sha }}  
 severity: CRITICAL,HIGH  
 exit-code: '1'
-
+```
 <img src="images/media/image10.png" style="width:6in;height:3.52876in" alt="The container-security.yml workflow open in VS Code" />
 
 *Figure 9. The workflow file in the repository. It still uses trivy-action@master, which the pinning note below recommends replacing.*
@@ -186,20 +186,20 @@ Every completed scan stores its results. A scan with critical findings also send
 3.  Store the results for the dashboard in every case.
 
 ### Slack notification
-
+```
 import requests  
 def send_slack(webhook_url, message):  
 resp = requests.post(webhook_url, json={"text": message}, timeout=10)  
 resp.raise_for_status()
-
+```
 ### Microsoft Teams notification
-
+```
 import requests  
   
 def send_teams(webhook_url, message):  
 resp = requests.post(webhook_url, json={"text": message}, timeout=10)  
 resp.raise_for_status()
-
+```
 The timeout and status check keep a slow or failing webhook from hanging the pipeline or passing silently.
 
 ### Sample alert
@@ -242,7 +242,7 @@ Three PostgreSQL tables hold each image, its findings and its scan history. The 
 | images | One row per scanned image | image_name, image_tag, scan_date |
 | vulnerabilities | One row per CVE found in an image | cve_id, severity, package_name, fixed_version, status |
 | scan_history | Severity counts per scan, for trends | critical_count, high_count, medium_count, low_count |
-
+```
 CREATE TABLE images (  
 id SERIAL PRIMARY KEY,  
 image_name VARCHAR(255) NOT NULL,  
@@ -270,7 +270,7 @@ medium_count INT NOT NULL DEFAULT 0,
 low_count INT NOT NULL DEFAULT 0,  
 scan_time TIMESTAMP NOT NULL  
 );
-
+```
 ## Dashboard
 
 The dashboard tracks the vulnerability history so teams can see whether critical and high findings are falling.
