@@ -11,7 +11,7 @@ An automated scanner that checks container images for known CVEs before they rea
 | Batch | 16A |
 | Submission date | Oct 31, 2026 |
 | Team | Gautam Gohel, Saleem Shaikh, Punit Patel, Abdulkadir Boxwala |
-| Source repository | [github.com/saleeminfodevops/secdevops](https://github.com/saleeminfodevops/secdevops.git) |
+| Source repository | [github.com/saleeminfodevops/devsecops](https://github.com/saleeminfodevops/devsecops.git) |
 | Updated document | [Google Doc](https://docs.google.com/document/d/1EQq9ZQ6r5vhlbLKhOe246gi9TYp4PXvanYFe-uUuYBQ/edit?usp=sharing) |
 
 <img width="946" height="583" alt="image" src="https://github.com/user-attachments/assets/3e258eed-664b-41a8-84f2-7cbcfda3c825" />
@@ -77,11 +77,11 @@ Six sprints of 20 hours each build the scanner in stages, from a basic scan to a
 
 ### Sprint 1 evidence: repository and scanner setup
 
-<img src="images/media/image4.png" style="width:6in;height:2.91002in" alt="GitHub repository page for secdevops" />
+<img src="images/media/image4.png" style="width:6in;height:2.91002in" alt="GitHub repository page for devsecops" />
 
-*Figure 4. The secdevops repository, with folders for the scanner, reporting, dashboard, monitoring and CI files.*
+*Figure 4. The devsecops repository, with folders for the scanner, reporting, dashboard, monitoring and CI files.*
 
-<img src="images/media/image5.png" style="width:6in;height:1.22472in" alt="Terminal output of git clone for the secdevops repository" />
+<img src="images/media/image5.png" style="width:6in;height:1.22472in" alt="Terminal output of git clone for the devsecops repository" />
 
 *Figure 5. Cloning the repository.*
 
@@ -157,8 +157,8 @@ jobs:
         run: |
           docker build --pull \
             -f dockerfiles/Dockerfile.ci \
-            -t "secdevops-ci:$GITHUB_SHA" .
-          docker image inspect "secdevops-ci:$GITHUB_SHA" >/dev/null
+            -t "devsecops-ci:$GITHUB_SHA" .
+          docker image inspect "devsecops-ci:$GITHUB_SHA" >/dev/null
 
       - name: Prepare report folder
         run: mkdir -p reporting/ci
@@ -167,7 +167,7 @@ jobs:
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: image
-          image-ref: secdevops-ci:${{ github.sha }}
+          image-ref: devsecops-ci:${{ github.sha }}
           scanners: vuln,secret
           format: json
           output: reporting/ci/trivy-report.json
@@ -219,7 +219,7 @@ jobs:
                   f"- HIGH vulnerabilities: {high}\n"
                   f"- CRITICAL vulnerabilities: {critical}\n"
                   f"- Secrets detected: {secrets}\n"
-                  f"- Image: secdevops-ci\n"
+                  f"- Image: devsecops-ci\n"
               )
 
           if high or critical or secrets:
@@ -245,7 +245,7 @@ jobs:
           import os
           import urllib.request
           body = json.dumps({
-              "text": f"SecDevOps CI status: {os.environ['JOB_STATUS']}\nRun: {os.environ['RUN_URL']}"
+              "text": f"devsecops CI status: {os.environ['JOB_STATUS']}\nRun: {os.environ['RUN_URL']}"
           }).encode()
           request = urllib.request.Request(
               os.environ["SLACK_WEBHOOK_URL"],
@@ -390,7 +390,7 @@ The figures above are sample data from the original brief, not live scan results
 Successful GitHub Actions execution and security summary.
 
 The successful run confirms the positive execution path for the minimal CI image. It does not establish that every application image is safe, that a vulnerable image is blocked, or that the artifact contents are complete beyond the reported validation step. The warning annotation is not expanded in the supplied screenshot and therefore remains unidentified.
-Run evidence: https://github.com/GohelG/secdevops/actions/runs/45415679780
+Run evidence: https://github.com/GohelG/devsecops/actions/runs/45415679780
 
 ## Troubleshooting and local evidence
 
